@@ -102,13 +102,20 @@ public class DomViewer {
 
     List<?> properties = node.structuralPropertiesForType();
     for (Iterator<?> iterator = properties.iterator(); iterator.hasNext();) {
-      assert iterator.next() instanceof StructuralPropertyDescriptor;
-      StructuralPropertyDescriptor descriptor = (StructuralPropertyDescriptor) iterator.next();
+      Object obj = iterator.next();
+      assert obj instanceof StructuralPropertyDescriptor;
+      StructuralPropertyDescriptor descriptor = (StructuralPropertyDescriptor) obj;
 
       if (descriptor instanceof SimplePropertyDescriptor) {
         
         SimplePropertyDescriptor simple = (SimplePropertyDescriptor) descriptor;
         Object value = node.getStructuralProperty(simple);
+        
+        // JavaDoc is part of the AST and their children have no value
+        if (value == null) {
+          continue;
+        }
+        
         output += "<li>" + value.getClass().getSimpleName() + " " + simple.getId() + ": \'"
             + value.toString() + "\'</li>\n";
       
