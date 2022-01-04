@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -21,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TODO.
+ * Generates a HTML file that displays the JDT AST extracted from a Java source file.
  * 
  * @author James Wasson
  * @author Eric Mercer
@@ -32,10 +31,10 @@ public class DomViewer {
   static final Logger log = LoggerFactory.getLogger(DomViewer.class);
 
   /**
-   * TODO.
+   * Given the ASTNode instance, print the HTML tree representation to a file.
    * 
-   * @param node TODO
-   * @param file TODO
+   * @param node The ASTNode instance to print in a tree view.
+   * @param file The file to output the HTML.
    */
   public static void writeDomToFile(ASTNode node, String file) {
     String nodeAsHtml = writeAsHtml2(node);
@@ -86,10 +85,10 @@ public class DomViewer {
   }
 
   /**
-   * TODO.
+   * Recursive function that creates a nested HTML tree.
    * 
-   * @param node TODO
-   * @return TODO
+   * @param node The ASTNode to display.
+   * @return The HTML representation of the ASTNode.
    */
   private static String astNodeAsHtmlInner(ASTNode node) {
 
@@ -100,29 +99,24 @@ public class DomViewer {
 
     output += itemHeader + node.getClass().getSimpleName() + nestedListHeader;
 
-    List<?> properties = node.structuralPropertiesForType();
-    for (Iterator<?> iterator = properties.iterator(); iterator.hasNext();) {
-      Object obj = iterator.next();
-      assert obj instanceof StructuralPropertyDescriptor;
+    for (Object obj : node.structuralPropertiesForType()) {
       StructuralPropertyDescriptor descriptor = (StructuralPropertyDescriptor) obj;
 
       if (descriptor instanceof SimplePropertyDescriptor) {
         
-        SimplePropertyDescriptor simple = (SimplePropertyDescriptor) descriptor;
-        Object value = node.getStructuralProperty(simple);
+        Object value = node.getStructuralProperty(descriptor);
         
-        // JavaDoc is part of the AST and their children have no value
+        // Ignore JavaDoc Property. JavaDoc is part of the AST and their children have no value
         if (value == null) {
           continue;
         }
         
-        output += "<li>" + value.getClass().getSimpleName() + " " + simple.getId() + ": \'"
+        output += "<li>" + value.getClass().getSimpleName() + " " + descriptor.getId() + ": \'"
             + value.toString() + "\'</li>\n";
       
       } else if (descriptor instanceof ChildPropertyDescriptor) {
       
-        ChildPropertyDescriptor child = (ChildPropertyDescriptor) descriptor;
-        ASTNode childNode = (ASTNode) node.getStructuralProperty(child);
+        ASTNode childNode = (ASTNode) node.getStructuralProperty(descriptor);
         if (childNode != null) {
           output += astNodeAsHtmlInner(childNode);
         }
@@ -157,9 +151,8 @@ public class DomViewer {
     try {
       return String.join("\n", Files.readAllLines(Paths.get(path)));
     } catch (IOException ioe) {
-      log.error(ioe.getMessage());
+      throw new RuntimeException("Error reading input file. Check input file path", ioe);
     }
-    return "";
   }
 
   /**
@@ -179,9 +172,9 @@ public class DomViewer {
   }
 
   /**
-   * TODO.
+   * Main method to execute DomViewer.
    * 
-   * @param args TODO
+   * @param args Input file string and output file string.
    */
   public static void main(String[] args) {
     if (args.length != 2) {
