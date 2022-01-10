@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -21,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TODO.
+ * Generates a HTML file that displays the JDT AST extracted from a Java source file.
  * 
  * @author James Wasson
  * @author Eric Mercer
@@ -29,13 +28,17 @@ import org.slf4j.LoggerFactory;
  */
 public class DomViewer {
 
-  static final Logger log = LoggerFactory.getLogger(DomViewer.class);
+  private static final Logger log = LoggerFactory.getLogger(DomViewer.class);
+  
+  private static final String ITEM_HEADER = "<li><span class=\"caret\">";
+  private static final String NESTED_LIST_HEADER = "</span>\n<ul class=\"nested\">\n";
+  private static final String NESTED_LIST_AND_ITEM_FOOTER = "</ul>\n</li>\n";
 
   /**
-   * TODO.
+   * Given the ASTNode instance, print the HTML tree representation to a file.
    * 
-   * @param node TODO
-   * @param file TODO
+   * @param node The ASTNode instance to print in a tree view.
+   * @param file The file to output the HTML.
    */
   public static void writeDomToFile(ASTNode node, String file) {
     String nodeAsHtml = writeAsHtml2(node);
@@ -51,7 +54,8 @@ public class DomViewer {
   private static String getHead() {
     return "<!DOCTYPE html>\n" + "<html>\n" + "<head>\n"
         + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n" + "<style>\n"
-        + "ul, #myUL {\n" + "  list-style-type: none;\n" + "}\n" + "\n" + "#myUL {\n"
+        + "ul, #myUL {\n" + "  list-style-type: none;\n" 
+        + "  font-family: 'DejaVu Sans Mono', monospace;\n" + "}\n" + "\n" + "#myUL {\n"
         + "  margin: 0;\n" + "  padding: 0;\n" + "}\n" + "\n" + ".caret {\n"
         + "  cursor: pointer;\n" + "  -webkit-user-select: none; /* Safari 3.1+ */\n"
         + "  -moz-user-select: none; /* Firefox 2+ */\n" + "  -ms-user-select: none; /* IE 10+ */\n"
@@ -61,8 +65,9 @@ public class DomViewer {
         + "  -ms-transform: rotate(90deg); /* IE 9 */\n"
         + "  -webkit-transform: rotate(90deg); /* Safari */'\n" + "  transform: rotate(90deg);  \n"
         + "}\n" + "\n" + ".nested {\n" + "  display: none;\n" + "}\n" + "\n" + ".active {\n"
-        + "  display: block;\n" + "}\n" + "</style>\n" + "</head>\n" + "<body>\n" + "\n"
-        + "<h2>Tree View</h2>\n"
+        + "  display: block;\n" + "}\n" + "\n" + "body {\n" 
+        + "  font-family: Arial, Helvetica, sans-serif;\n" + "}\n" + "</style>\n" + "</head>\n" 
+        + "<body>\n" + "\n" + "<h2>Tree View</h2>\n"
         + "<p>Click on the arrow(s) to open or close the tree branches.</p>\n" + "\n";
   }
 
@@ -86,65 +91,76 @@ public class DomViewer {
   }
 
   /**
-   * TODO.
+   * Recursive function that creates a nested HTML tree.
    * 
-   * @param node TODO
-   * @return TODO
+   * @param node The ASTNode to display.
+   * @return The HTML representation of the ASTNode.
    */
   private static String astNodeAsHtmlInner(ASTNode node) {
 
-    String output = "";
-    String itemHeader = "<li><span class=\"caret\">";
-    String nestedListHeader = "</span>\n<ul class=\"nested\">\n";
-    String nestedListFooterItemFooter = "</ul>\n</li>\n";
+    String output = ITEM_HEADER + node.getClass().getSimpleName() + NESTED_LIST_HEADER;
 
-    output += itemHeader + node.getClass().getSimpleName() + nestedListHeader;
-
-    List<?> properties = node.structuralPropertiesForType();
-    for (Iterator<?> iterator = properties.iterator(); iterator.hasNext();) {
-      Object obj = iterator.next();
-      assert obj instanceof StructuralPropertyDescriptor;
+    for (Object obj : node.structuralPropertiesForType()) {
       StructuralPropertyDescriptor descriptor = (StructuralPropertyDescriptor) obj;
 
       if (descriptor instanceof SimplePropertyDescriptor) {
+        Object value = node.getStructuralProperty(descriptor);
         
-        SimplePropertyDescriptor simple = (SimplePropertyDescriptor) descriptor;
-        Object value = node.getStructuralProperty(simple);
-        
-        // JavaDoc is part of the AST and their children have no value
+        // Ignore JavaDoc Property. JavaDoc is part of the AST and their children have no value
         if (value == null) {
           continue;
         }
         
-        output += "<li>" + value.getClass().getSimpleName() + " " + simple.getId() + ": \'"
-            + value.toString() + "\'</li>\n";
+        output += "<li>" + value.getClass().getSimpleName() + " " 
+            + getMethodName(descriptor, value.getClass()) + "() =&gt; \'" + value.toString() 
+            + "\'</li>\n";
       
       } else if (descriptor instanceof ChildPropertyDescriptor) {
-      
-        ChildPropertyDescriptor child = (ChildPropertyDescriptor) descriptor;
-        ASTNode childNode = (ASTNode) node.getStructuralProperty(child);
+        ASTNode childNode = (ASTNode) node.getStructuralProperty(descriptor);
+        String methodName = getMethodName(descriptor, null);
+        String methodReturnType = getMethodReturnType(node, methodName);
+
+        output += ITEM_HEADER + methodReturnType + " " + methodName + "()" + NESTED_LIST_HEADER;
         if (childNode != null) {
           output += astNodeAsHtmlInner(childNode);
         }
+        output += NESTED_LIST_AND_ITEM_FOOTER;
       
       } else {
-      
         ChildListPropertyDescriptor list = (ChildListPropertyDescriptor) descriptor;
-        output += itemHeader + list.getElementType().getSimpleName() + nestedListHeader;
-        output += itemHeader + list.getId() + nestedListHeader;
+        output += ITEM_HEADER + "List&lt;" + list.getElementType().getSimpleName() + "&gt; " 
+            + list.getId() + "()" + NESTED_LIST_HEADER;
 
         for (Object j : (List<?>) node.getStructuralProperty(list)) {
           output += astNodeAsHtmlInner((ASTNode) j);
         }
 
-        output += nestedListFooterItemFooter;
-        output += nestedListFooterItemFooter;
+        output += NESTED_LIST_AND_ITEM_FOOTER;
       }
 
     }
 
-    output += nestedListFooterItemFooter;
+    output += NESTED_LIST_AND_ITEM_FOOTER;
     return output;
+  }
+
+  private static String getMethodReturnType(ASTNode node, String methodName) {
+    String methodReturnType = "*";
+    try {
+      methodReturnType = node.getClass()
+          .getMethod(methodName)
+          .getReturnType()
+          .getSimpleName();
+    } catch (NoSuchMethodException | SecurityException e) {
+      log.warn("Method name {} does not exist for class {}", methodName, node.getClass());
+    }
+    return methodReturnType;
+  }
+
+  private static String getMethodName(StructuralPropertyDescriptor descriptor, Class<?> clazz) {
+    String prefix = clazz != null && clazz.isAssignableFrom(Boolean.class) ? "is" : "get";
+    return prefix + Character.toUpperCase(descriptor.getId().charAt(0)) 
+        + descriptor.getId().substring(1);
   }
 
   /**
@@ -157,9 +173,8 @@ public class DomViewer {
     try {
       return String.join("\n", Files.readAllLines(Paths.get(path)));
     } catch (IOException ioe) {
-      log.error(ioe.getMessage());
+      throw new RuntimeException("Error reading input file. Check input file path", ioe);
     }
-    return "";
   }
 
   /**
@@ -179,9 +194,9 @@ public class DomViewer {
   }
 
   /**
-   * TODO.
+   * Main method to execute DomViewer.
    * 
-   * @param args TODO
+   * @param args Input file string and output file string.
    */
   public static void main(String[] args) {
     if (args.length != 2) {
