@@ -106,8 +106,8 @@ public class DomViewer {
       if (descriptor instanceof SimplePropertyDescriptor) {
         Object value = node.getStructuralProperty(descriptor);
         
-        // Ignore JavaDoc Property. JavaDoc is part of the AST and their children have no value
         if (value == null) {
+          log.warn("Ignoring null StructuralProperty from SimplePropertyDescriptor {} for node {}", descriptor, node);
           continue;
         }
         
@@ -119,6 +119,12 @@ public class DomViewer {
         ASTNode childNode = (ASTNode) node.getStructuralProperty(descriptor);
         String methodName = getMethodName(descriptor, null);
         String methodReturnType = getMethodReturnType(node, methodName);
+        log.trace("Descriptor methodName: {} returnType {}", methodName, methodReturnType);
+
+        // Ignore JavaDoc Property. JavaDoc is part of the AST and their children have no value
+        if (methodReturnType.equals("Javadoc")) {
+          continue;
+        }
 
         output += ITEM_HEADER + methodReturnType + " " + methodName + "()" + NESTED_LIST_HEADER;
         if (childNode != null) {
@@ -208,6 +214,8 @@ public class DomViewer {
     File inputFile = new File(args[0]);
     String inputFileAsString = readFile(inputFile.getPath());
     ASTNode node = parse(inputFileAsString);
+
+    log.info("Node parsed from {}. Writing to file {}. Parsed node: {}", inputFile, args[1], node);
     writeDomToFile(node, args[1]);
   }
 }
